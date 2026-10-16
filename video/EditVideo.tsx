@@ -1,3 +1,4 @@
+// video/EditVideo.tsx
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   AbsoluteFill, Easing, Freeze, Html5Audio, Html5Video, OffthreadVideo, Sequence,
@@ -37,7 +38,7 @@ export function getAutoCuts(videoClips: readonly VideoClip[], beats: readonly nu
   }]);
 }
 
-/** Integrate velocity; multiplying elapsed time by a changing playbackRate would jump. */
+/** Integrate velocity: elapsed time × changing playbackRate would cause jumps. */
 export function getSourceFrames(clip: VideoClip, duration: number, fps: number, from: number, beats: readonly number[]) {
   const last = clip.sourceDuration === undefined ? Infinity : Math.max(0, Math.floor(clip.sourceDuration * fps) - 1);
   let source = Math.min(last, Math.max(0, (clip.sourceStart ?? 0) * fps));
@@ -95,11 +96,12 @@ const Broll: React.FC<{clip: VideoClip; duration: number; from: number; beats: r
   const drift = interpolate(frame, [0, Math.max(1, duration - 1)], [0, 1], tween);
   const direction = beatIndex % 2 ? -1 : 1;
   const Video = getRemotionEnvironment().isRendering ? OffthreadVideo : Html5Video;
+
   return <AbsoluteFill>
     <AbsoluteFill style={{overflow: 'hidden', padding: clip.title ? '8% 8% 18%' : 0}}>
       <div style={{width: '100%', height: '100%', scale: (1 + drift * 0.05) * (1 + pulse * 0.08),
         translate: `${width * (0.006 * drift + 0.008 * pulse * direction)}px ${height * (-0.004 * drift + 0.006 * pulse * direction)}px`}}>
-        {/* Frame-accurate retiming in both Player and export; no fabricated optical-flow frames. */}
+        {/* Frame-accurate retiming; optical-flow-style camera motion without synthesized frames. */}
         <Freeze frame={0}>
           <Video src={clip.src} trimBefore={source[Math.max(0, Math.min(duration - 1, frame))] ?? 0}
             muted playbackRate={1} pauseWhenBuffering
@@ -123,6 +125,7 @@ export const AutoCutTimeline: React.FC<{
   const beats = useMemo(() => orderedBeats(audioData ? getBeatTimestamps(audioData, fps) : beatTimestamps ?? [], durationInFrames),
     [audioData, beatTimestamps, fps, durationInFrames]);
   const cuts = getAutoCuts(videoClips, beats.filter(beat => beat >= from && beat <= (to ?? durationInFrames)), beatsPerClip);
+
   return <>{cuts.map(({clip, from: start, to: end}, i) => <Sequence key={`${start}-${i}`} from={start}
     durationInFrames={end - start} premountFor={fps} name={clip.title || `Auto cut ${i + 1}`}>
     <Broll clip={clip} from={start} duration={end - start} beats={beats} />
@@ -131,8 +134,8 @@ export const AutoCutTimeline: React.FC<{
 
 export const AppleComposition: React.FC<{plan: EditPlan; audioData?: BeatAudioData}> = ({plan, audioData}) => {
   const {fps, durationInFrames} = useVideoConfig();
-  // Existing plans already carry detected transients; raw PCM can use the new detector.
-  // A manual BPM grid is never treated as detected audio peaks.
+  // Existing plans carry detected transients; decoded PCM can use the new detector.
+  // Manual BPM grids are never promoted to detected audio peaks.
   const beats = useMemo(() => orderedBeats(audioData ? getBeatTimestamps(audioData, fps)
     : plan.analysis.source === 'detected' ? plan.analysis.beats.map(seconds => Math.round(seconds * fps)) : [],
     durationInFrames), [audioData, plan.analysis, fps, durationInFrames]);
@@ -154,6 +157,7 @@ export const AppleComposition: React.FC<{plan: EditPlan; audioData?: BeatAudioDa
   const revealClip = clips.find(clip => clip.title) ?? clips[0];
   const detailClips = clips.filter(clip => !clip.title);
   const dark = plan.settings.theme !== 'white';
+
   return <AbsoluteFill style={{background: dark ? '#000000' : '#ffffff', color: dark ? '#ffffff' : '#000000', fontFamily: 'Inter, sans-serif', overflow: 'hidden'}}>
     <FontGate />
     {structured ? <>
@@ -176,5 +180,5 @@ export const AppleComposition: React.FC<{plan: EditPlan; audioData?: BeatAudioDa
   </AbsoluteFill>;
 };
 
-// Preserve the existing Player and renderer imports.
+// Preserve existing Player and renderer imports.
 export const EditVideo = AppleComposition;
