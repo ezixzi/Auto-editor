@@ -66,20 +66,49 @@ const FontGate: React.FC = () => {
   return null;
 };
 
+const EditorialMotif: React.FC = () => {
+  const frame = useCurrentFrame();
+  const {width, height, fps, durationInFrames} = useVideoConfig();
+  const reveal = spring({frame, fps, config: physics, durationInFrames: Math.min(22, durationInFrames)});
+  const opacity = interpolate(frame, [0, Math.max(1, fps * 0.45)], [0, 0.2], tween);
+  const radius = Math.min(width, height) * 0.19;
+  return <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
+    style={{position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity, scale: 0.94 + reveal * 0.06}}>
+    <circle cx={width * 0.91} cy={height * 0.2} r={radius} fill="none" stroke="currentColor" strokeWidth={Math.max(1, width * 0.0012)} />
+    <path d={`M ${width * 0.09} ${height * 0.79} H ${width * 0.2}`} fill="none" stroke="#F04438" strokeWidth={Math.max(2, width * 0.003)} />
+    <circle cx={width * 0.2} cy={height * 0.79} r={Math.max(3, width * 0.004)} fill="#F04438" />
+  </svg>;
+};
+
 const Title: React.FC<{headline: string; subtitle?: string; compact?: boolean}> = ({headline, subtitle, compact}) => {
   const frame = useCurrentFrame();
   const {fps, width, height, durationInFrames} = useVideoConfig();
-  const entrance = spring({frame, fps, config: physics, durationInFrames: Math.min(24, durationInFrames)});
   const fontSize = Math.min(width * 0.085, height * 0.12) * Math.min(1, 32 / Math.max(32, headline.length));
+  const tokens = headline.match(/\s+|[^\s]+/g) ?? [headline];
+  const lastWord = tokens.reduce((last, token, index) => token.trim() ? index : last, -1);
+  let word = 0;
+  const title = tokens.map((token, index) => {
+    if (!token.trim()) return token;
+    const position = word++;
+    const delay = Math.min(position * 3, Math.round(fps * 0.45));
+    const entrance = spring({frame: frame - delay, fps, config: physics, durationInFrames: Math.min(19, durationInFrames)});
+    const direction = position % 2 ? -1 : 1;
+    return <span key={index} style={{display: 'inline-block', color: index === lastWord ? '#F04438' : 'inherit',
+      translate: `${direction * (1 - entrance) * width * 0.025}px ${(1 - entrance) * height * 0.045}px`,
+      scale: 0.9 + entrance * 0.1, rotate: `${direction * (1 - entrance) * 2.5}deg`,
+      opacity: interpolate(frame - delay, [0, Math.max(1, fps * 0.38)], [0, 1], tween)}}>{token}</span>;
+  });
+  const subtitleEntrance = spring({frame: frame - Math.min(6, Math.round(fps * 0.2)), fps, config: physics,
+    durationInFrames: Math.min(20, durationInFrames)});
   return <AbsoluteFill style={{justifyContent: compact ? 'flex-end' : 'center', alignItems: 'center', padding: compact ? '0 12% 7%' : '16%', textAlign: 'center'}}>
+    {!compact ? <EditorialMotif /> : null}
     <div style={{maxWidth: '100%', overflow: 'hidden'}}>
       <div style={{fontSize: compact ? fontSize * 0.7 : fontSize, fontWeight: 700, letterSpacing: '0.075em', lineHeight: 1.18,
-        overflowWrap: 'anywhere', textWrap: 'balance', translate: `0 ${(1 - entrance) * height * 0.07}px`, scale: 0.96 + entrance * 0.04,
-        opacity: interpolate(frame, [0, Math.max(1, fps * 0.4)], [0, 1], tween)}}>{headline}</div>
+        overflowWrap: 'anywhere', textWrap: 'balance', whiteSpace: 'pre-wrap'}}>{title}</div>
     </div>
     {!compact && subtitle ? <div style={{marginTop: height * 0.035, maxWidth: '90%', fontSize: fontSize * 0.27, lineHeight: 1.6,
-      letterSpacing: '0.06em', translate: `0 ${(1 - entrance) * height * 0.035}px`,
-      opacity: interpolate(frame, [0, Math.max(1, fps * 0.5)], [0, 0.65], tween)}}>{subtitle}</div> : null}
+      letterSpacing: '0.06em', translate: `0 ${(1 - subtitleEntrance) * height * 0.035}px`,
+      opacity: interpolate(frame - Math.min(6, Math.round(fps * 0.2)), [0, Math.max(1, fps * 0.5)], [0, 0.65], tween)}}>{subtitle}</div> : null}
   </AbsoluteFill>;
 };
 
